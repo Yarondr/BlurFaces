@@ -1,62 +1,48 @@
 print("Loading...")
-from time import sleep
-import blurfaces
-import tkinter as tk
-from tkinter import filedialog, simpledialog
 import os
+from time import sleep
+import config
+import cv2
+from google.cloud import vision
 
+from utils.blur_faces import blur_faces
+from utils.face_detector import detect_faces
+from utils.image_loader import load_images, select_blur_level
 
-def select_folder():
-    # select folder
-    print("Please select the folder containing the images to be blurred")
-    tk.Tk().withdraw()
-    folder_path = filedialog.askdirectory()
-    if not folder_path:
-        print("\nNo folder selected!")
-        print("You can close the program by closing this window\n")
-        folder_path = select_folder()
-    return folder_path
+def load_config():
+    os.environ['GOOGLE_APPLICATION_CREDENTIALS'] = config.GOOGLE_APPLICATION_CREDENTIALS
 
+def save_image(image, image_path):
+    file_name = os.path.basename(image_path)
+    file_folder = os.path.dirname(image_path)
 
-def select_blur_level():
-    # select blur level
-    print("Please select the blur level")
-    tk.Tk().withdraw()
-    blur_level = simpledialog.askinteger("Blur level", "Enter a number between 1 and 10")
-    if not blur_level:
-        print("\nNo blur level selected!")
-        print("You can close the program by closing this window\n")
-        blur_level = select_blur_level()
-    if blur_level < 1 or blur_level > 10:
-        print("\nInvalid blur level!")
-        print("You can close the program by closing this window\n")
-        blur_level = select_blur_level()
-    return blur_level
-
-if __name__ == '__main__':
-    # load face detector model
-    blurfaces.load_model()
-
-
-    # select folder
-    folder_path = select_folder()
+    if not os.path.exists(file_folder + "/blurred_faces"):
+        os.makedirs(file_folder + "/blurred_faces")
     
-    # get blue level
+    new_path = os.path.join(file_folder + "/blurred_faces", file_name)
+    ext = new_path.split(".")[-1]
+    cv2.imencode("."+ext, image)[1].tofile(new_path)
+    
+if __name__ == "__main__":
+    load_config()
+    client = vision.ImageAnnotatorClient()
+    
+    images = load_images()
     blur_level = select_blur_level()
     print("\nBlur level: " + str(blur_level))
-
-    # go through all images in the folder
     print("Blurring faces...")
-    blurred_photos = 0
-    for image_path in os.listdir(folder_path):
-        file_ext = image_path.split(".")[-1]
-        full_path = os.path.join(folder_path, image_path)
-        if os.path.isfile(full_path):
-            if file_ext == "jpg" or file_ext == "jpeg" or file_ext == "png":
-                # blur the image
-                blurfaces.blur_faces(full_path, blur_level)
-                blurred_photos += 1
     
-    print("\nBlurred {} photos!".format(blurred_photos))
+    for image_path in images:
+        with open(image_path, "rb") as image_file:
+            content = image_file.read()
+        
+        faces = detect_faces(client, content)
+        blured_image = blur_faces(content, faces, blur_level)
+        save_image(blured_image, image_path)
+        
+        for face in faces:
+            print(face.bounding_poly)
+            print(face.bounding_poly.vertices)
+    print("Blurred {} photos!".format(len(images)))
     print("Exiting...")
     sleep(1.5)
