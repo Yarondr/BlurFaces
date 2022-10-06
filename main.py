@@ -3,7 +3,7 @@ import os
 from time import sleep
 import config
 import cv2
-from google.cloud import vision
+from google.cloud.vision import ImageAnnotatorClient
 
 from utils.blur_faces import blur_faces
 from utils.face_detector import detect_faces
@@ -25,7 +25,7 @@ def save_image(image, image_path):
     
 if __name__ == "__main__":
     load_config()
-    client = vision.ImageAnnotatorClient()
+    client = ImageAnnotatorClient()
     
     images = load_images()
     blur_level = select_blur_level()
